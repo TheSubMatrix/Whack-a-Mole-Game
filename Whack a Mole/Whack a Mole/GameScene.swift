@@ -12,39 +12,67 @@ class GameScene: SKScene {
     
     var lastUpdateTime: TimeInterval = 0
     var deltaTime: TimeInterval = 0
-    let zombie = SKSpriteNode(imageNamed: "zombie1")
-    let zombieScale = 0.6
-    var zombieVelocity: CGPoint = CGPoint.zero
-    var zombieSpeed: CGFloat = 480
-    
-    func spawnEnemy()
+    let moleUpTexture =  SKTexture(imageNamed: "mole-head")
+    let moleDownTexture = SKTexture(imageNamed: "mole-hill")
+    var moles = Array<Mole>()
+    class Mole
     {
-        let enemy = SKSpriteNode(imageNamed: "enemy")
-        enemy.setScale(zombieScale)
-        enemy.position = CGPoint(x: size.width / 2 + enemy.size.width/2, y:0)
-        addChild(enemy)
-        let actionMove = SKAction.moveTo(x: -size.width/2 - enemy.size.width/2, duration: 2.0)
-        let actionRemove = SKAction.removeFromParent()
-        let enemySequence = SKAction.sequence([actionMove, actionRemove])
-        enemy.run(enemySequence)
+        init(emptyHoleTexture: SKTexture, moleTexture: SKTexture, scale: CGFloat, position: CGPoint, scene: SKScene)
+        {
+            self.emptyHoleTexture = emptyHoleTexture
+            self.moleTexture = moleTexture
+            self.sprite = SKSpriteNode(texture: emptyHoleTexture)
+            self.sprite.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            self.sprite.setScale(scale)
+            self.sprite.position = position
+            scene.addChild(self.sprite)
+        }
+        var timeSinceLastAction: TimeInterval = 0
+        var enemyRoutine: SKAction?
+        var sprite: SKSpriteNode
+        var emptyHoleTexture: SKTexture
+        var moleTexture: SKTexture
+        
+        func CheckInBounds(position: CGPoint) -> Bool
+        {
+            if self.sprite.texture != moleTexture{ return false }
+            return sprite.frame.contains(position)
+        }
+        func ShowMole()
+        {
+            self.sprite.texture = moleTexture
+        }
+        func HideMole()
+        {
+            self.sprite.texture = emptyHoleTexture
+        }
+        func SwapState()
+        {
+            if self.sprite.texture != moleTexture
+            {
+                self.sprite.texture = moleTexture
+            }
+            else
+            {
+                self.sprite.texture = emptyHoleTexture
+            }
+        }
     }
+    
+    
     
     
     //Awake
     override func didMove(to view: SKView)
     {
         backgroundColor = SKColor.black
-        zombie.position = CGPoint(x: -size.width / 4, y: -size.height / 4)
-        zombie.setScale(zombieScale)
-        addChild(zombie)
-        let wait = SKAction.wait(forDuration: 2.0)
-        let spawnEnemyAction = SKAction.run {
-            [weak self] in self?.spawnEnemy()
+        for i in 0...2
+        {
+            for j in 0...2
+            {
+                moles.append(Mole(emptyHoleTexture: moleDownTexture, moleTexture: moleUpTexture, scale: 0.2, position: CGPoint(x:(0-(1334.0 / 2.0)) + (1334.0 / 4.0) + (Double(i) * (1334.0 / 4.0)), y: (0-(750.0 / 2.0)) + (750.0 / 4.0) + (Double(j) * (750.0 / 4.0))), scene: self))
+            }
         }
-        let spawnEnemySequence = SKAction.sequence([spawnEnemyAction, wait])
-        let keepRespawningEnemy = SKAction.repeatForever(spawnEnemySequence)
-        run(keepRespawningEnemy)
-    
     }
     //Update
     override func update(_ currentTime: TimeInterval)
@@ -58,34 +86,32 @@ class GameScene: SKScene {
             deltaTime = 0
         }
         lastUpdateTime = currentTime
-        Move(sprite: zombie, velocity: zombieVelocity)
-    }
-    func DetermineVelocity(location: CGPoint)
-    {
-        let offset = CGPoint(x: location.x - zombie.position.x, y: location.y - zombie.position.y)
-        let length = sqrt(offset.x * offset.x + offset.y * offset.y)
-        if length > 0
+        
+        for i in moles
         {
-            let direction = CGPoint(x: offset.x / length, y: offset.y / length)
-            zombieVelocity = CGPoint(x: direction.x * zombieSpeed, y: direction.y * zombieSpeed)
+            let time = TimeInterval.random(in: 2...100)
+            if i.timeSinceLastAction > time
+            {
+                i.SwapState()
+                i.timeSinceLastAction = 0
+            }
+            i.timeSinceLastAction += deltaTime
         }
+
     }
-    func Move( sprite: SKSpriteNode, velocity: CGPoint)
-    {
-        let amountToMove = CGPoint(x: velocity.x * deltaTime, y: velocity.y * deltaTime)
-        sprite.position = CGPoint(x: sprite.position.x + amountToMove.x, y: sprite.position.y + amountToMove.y)
-    }
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?)
     {
         guard let touch = touches.first else{return}
         let touchLocation = touch.location(in: self)
-        DetermineVelocity(location: touchLocation)
+        for i in moles
+        {
+            if i.CheckInBounds(position: touchLocation)
+            {
+                i.HideMole()
+                i.timeSinceLastAction = 0
+            }
+        }
     }
-    //Move Finger
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?)
-    {
-        guard let touch = touches.first else{return}
-        let touchLocation = touch.location(in: self)
-        DetermineVelocity(location: touchLocation)
-    }
+    
 }
